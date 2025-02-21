@@ -3,6 +3,7 @@ import pandas as pd
 import datetime
 from dateutil.relativedelta import relativedelta
 import os
+from openpyxl import load_workbook
 
 # 저장소 목록 정의
 repositories = {
@@ -12,6 +13,7 @@ repositories = {
     'plug in': 'C:\\Users\\LEEGEONWOO\\Dev\\API\\PUBLIC-plugins',
     # 추가 저장소 경로
 }
+
 TODAY = datetime.date.today()
 def main():
   for project, path in repositories.items():
@@ -33,7 +35,6 @@ def main():
           mode = 'a' if os.path.exists(file_path) else 'w'
           existSheet = 'replace' if os.path.exists(file_path) else None
           with pd.ExcelWriter(file_path, engine='openpyxl', mode=mode, if_sheet_exists=existSheet) as writer:
-
             df.to_excel(writer, index=False, sheet_name=f"{project}")
             # 열 너비 설정
             workbook = writer.book
@@ -42,7 +43,15 @@ def main():
             worksheet.column_dimensions['B'].width = 20
             worksheet.column_dimensions['C'].width = 20
             worksheet.column_dimensions['D'].width = 100
-            
+          # 필터 설정
+          setFilter(project, file_path)
+
+def setFilter(project, file_path):
+    wb = load_workbook(file_path)
+    ws = wb[project]
+    ws.auto_filter.ref = "B:C"
+    wb.save(file_path)
+
 def inputData(proc):
   newData = {
   '코드': [],
