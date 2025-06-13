@@ -8,24 +8,42 @@ from openpyxl import load_workbook
 # 저장소 목록 정의
 repositories = {
     'CIVIL NX Master': 'C:\\Users\\LEEGEONWOO\\Dev\\CIVIL_NX\\genw_new',
+    'CIVIL NX feature 8649': 'C:\\Users\\LEEGEONWOO\\Dev\\CIVIL_NX\\genw_new',
     'CIVIL NX 955': 'C:\\Users\\LEEGEONWOO\\Dev\\CIVIL_NX_v955',
     'eGen': 'C:\\Users\\LEEGEONWOO\\Dev\\eGen\\egen_jp_2017_ODA',
     'plug in': 'C:\\Users\\LEEGEONWOO\\Dev\\API\\PUBLIC-plugins',
+    "VBS": 'C:\\Users\\LEEGEONWOO\\Dev\\VBS',
+    "Log Check": 'C:\\Users\\LEEGEONWOO\\Dev\\로그관리\\log-python',
     # 추가 저장소 경로
+}
+
+branch_name = {
+  "CIVIL NX Master" : "NX/master",
+  "CIVIL NX feature 8649" : "feature/CIVIL-8649",
+  'CIVIL NX 955': '',
+  'eGen': '',
+  'plug in': '',
+  "VBS" : '',
+  "Log Check" : ''
 }
 
 TODAY = datetime.date.today()
 def main():
+  dfArr = {}
   for project, path in repositories.items():
       print(f"Commit History for {project}:")
+      dfArr[project] = {}
+      cmd = ["git", "-C", path, "log", branch_name[project], "--pretty=format:%h - %an, %ar : %s"] if branch_exists(path, branch_name[project]) else ["git", "-C", path, "log", "--pretty=format:%h - %an, %ar : %s"]
       with subprocess.Popen(
-            ["git", "-C", path, "log", "--pretty=format:%h - %an, %ar : %s"],
+            cmd,
             stdout=subprocess.PIPE,
             text=True,
             encoding="utf-8"
         ) as proc:
         data = inputData(proc)
         if data :
+          data["프로젝트"] = project
+          dfArr[project] = data
           df = pd.DataFrame(data)
           folder_path =  f"./logExcel/{str(TODAY).split("-")[0]}/"
           if not os.path.exists(folder_path):
@@ -45,6 +63,20 @@ def main():
             worksheet.column_dimensions['D'].width = 100
           # 필터 설정
           setFilter(project, file_path)
+  # print(dfArr)
+  makeExcel()
+
+def branch_exists(path, branch):
+    result = subprocess.run(
+        ["git", "-C", path, "rev-parse", "--verify", branch],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
+    return result.returncode == 0
+
+def makeExcel():
+  
+  pass
 
 def setFilter(project, file_path):
     wb = load_workbook(file_path)
@@ -63,14 +95,22 @@ def inputData(proc):
     sLine = line.split(" : ")[0].split(",")
     if len(sLine) > 2 : continue
     bYearCheck = sLine[1].split()[1]
-    if bYearCheck == "months" or bYearCheck == "years" or  bYearCheck == "year": continue
+    # if bYearCheck == "months" or bYearCheck == "years" or  bYearCheck == "year": continue
+    if  bYearCheck == "years" or  bYearCheck == "year": continue
 
     code = sLine[0].split(" - ")[0]
     user = sLine[0].split(" - ")[1]
     commitMsg = line.split(" : ")[1]
-    if user == "chlim" or user == "gw.lee":
+    if user == "chlim" or user == "gw.lee" or user == "jkato-midasit":
       bWeekCheck = sLine[1].split()[1]
-      if bWeekCheck == "weeks" or bWeekCheck == "week":
+      if bWeekCheck == "months" or bWeekCheck == "month":
+        month = sLine[1].split()[0]
+        if int(month) < 7:
+          newData["코드"].append(code)
+          newData["이름"].append(user)
+          newData["날짜"].append(getDate("month", int(month)))
+          newData["commit"].append(commitMsg)
+      elif bWeekCheck == "weeks" or bWeekCheck == "week":
         week = sLine[1].split()[0]
         if int(week) < 9:
           newData["코드"].append(code)
@@ -93,7 +133,10 @@ def inputData(proc):
   return newData
 
 def getDate(strDay, nCnt):
-  if strDay == "week":
+  if strDay == "month":
+    # month
+    ago = TODAY - relativedelta(months=nCnt)
+  elif strDay == "week":
     # week
     ago = TODAY - relativedelta(weeks=nCnt)
   elif strDay == "hour":
